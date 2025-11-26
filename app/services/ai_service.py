@@ -87,7 +87,7 @@ async def run_stage_1_extraction(file_paths: list[str]) -> dict:
             contents.append(types.Part.from_bytes(data=image_data, mime_type=mime_type))
 
     # Call Gemini Flash
-    model_id = "gemini-1.5-flash"  # Adjust to 2.5 when available
+    model_id = "gemini-2.5-flash"  # Adjust to 2.5 when available
 
     try:
         response = await client.aio.models.generate_content(
@@ -147,7 +147,7 @@ async def run_stage_2_verification(
     """
 
     # Call Gemini Pro
-    model_id = "gemini-1.5-pro"  # Adjust to 2.5 Pro when available
+    model_id = "gemini-2.5-pro"  # Adjust to 2.5 Pro when available
 
     try:
         response = await client.aio.models.generate_content(
