@@ -69,7 +69,7 @@ async def run_stage_1_extraction(file_paths: list[str]) -> dict:
        - Note any visible address numbers or landmarks if present.
     
     3. **Trust Score Documents** (Employment Letter, Pay Slip, School Admission, School Fees, etc.):
-       - Extract: Document Type, Organization Name, Person Name, Date.
+       - Extract: Document Type, Organization Name, Person Name, Date, Address (if present).
     
     Return a JSON object with a list of analyzed documents, e.g.:
     {
@@ -144,32 +144,37 @@ async def run_stage_2_verification(
     file_metadata = session.file_metadata or {}
 
     prompt = f"""
-    You are a verification agent. Compare the extracted information with the user claims, geolocation, and file metadata.
+    You are a verification agent. Your goal is to verify that the User's Claimed Address is genuine based on the provided evidence.
     
     User Claims: {json.dumps(user_claims)}
     Extracted Data: {json.dumps(extracted_data)}
     Geolocation (Claimed): {json.dumps(geolocation)}
     File Metadata (EXIF/GPS): {json.dumps(file_metadata)}
     
-    Task:
-    1. **Location Verification**:
-       - Check if any 'House Image' has GPS metadata in 'File Metadata'.
-       - If yes, calculate the distance between Claimed Geolocation and Image GPS.
-       - Match if distance < 100 meters.
+    Analyze ALL provided data to calculate a Trust Score (0-100).
     
-    2. **Address Verification**:
-       - Check if any 'Logistics Receipt' has an address matching the Claimed Address.
+    Scoring Criteria:
+    1. **Physical Location Evidence (House Image)**:
+       - If House Image is present AND GPS metadata matches Claimed Geolocation (< 100m): +30 points.
+       - If House Image is present but no GPS match (visual confirmation only): +10 points.
     
-    3. **Trust Score Calculation**:
-       - Base Score: 0
-       - **Location Match (GPS)**: +30 points (if House Image GPS matches Claimed Location).
-       - **Address Match (Logistics)**: +30 points (if Receipt Address matches Claimed Address).
-       - **Trust Documents**: +10 points for each valid verified document (Employment, School, etc.), up to +40 points.
-       - **Recency**: +10 points if documents are recent (< 3 months).
+    2. **Logistics/Activity Evidence (Delivery Receipts)**:
+       - If a recent Logistics/Delivery Receipt matches the Claimed Address: +30 points.
+       - If the name on the receipt also matches the User: +5 bonus points.
+    
+    3. **Institutional/Trust Evidence (Employment, School, etc.)**:
+       - For EACH valid document (Employment Letter, Pay Slip, School Admission, School Fees, etc.) that verifies the User's Identity: +10 points.
+       - If the document ALSO contains the Claimed Address: +5 bonus points per document.
+       - Max points for this category: 40.
+    
+    4. **Recency Check**:
+       - If the majority of documents are recent (< 3 months): +10 points.
+    
+    Total Score cannot exceed 100.
     
     Return a JSON object with:
     - trust_score: integer (0-100)
-    - breakdown: object with details of matches (location_match, address_match, trust_docs_match)
+    - breakdown: object with details (house_match, logistics_match, institutional_proofs, recency)
     - verdict: "Approved" (Score >= 70), "Review" (Score 50-69), "Rejected" (Score < 50)
     """
 
