@@ -2,6 +2,7 @@ from uuid import UUID
 from sqlalchemy import select
 import json
 import os
+from datetime import datetime
 from google import genai
 from google.genai import types
 from app.core.database import AsyncSessionLocal
@@ -142,10 +143,12 @@ async def run_stage_2_verification(
 
     geolocation = {"latitude": session.latitude, "longitude": session.longitude}
     file_metadata = session.file_metadata or {}
+    current_date = datetime.now().strftime("%Y-%m-%d")
 
     prompt = f"""
     You are a verification agent. Your goal is to verify that the User's Claimed Address is genuine based on the provided evidence.
     
+    Current Date: {current_date}
     User Claims: {json.dumps(user_claims)}
     Extracted Data: {json.dumps(extracted_data)}
     Geolocation (Claimed): {json.dumps(geolocation)}
