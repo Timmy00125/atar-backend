@@ -1,8 +1,13 @@
 import uuid
-from datetime import datetime
-from sqlalchemy import Column, String, Float, Integer, DateTime, ARRAY, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from datetime import datetime, timezone
+from sqlalchemy import Column, String, Float, Integer, ARRAY, JSON
+from sqlalchemy.dialects.postgresql import UUID, TIMESTAMP
 from app.core.database import Base
+
+
+def utc_now():
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 
 
 class VerificationSession(Base):
@@ -10,7 +15,7 @@ class VerificationSession(Base):
 
     session_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     status = Column(String, default="pending")  # pending, processing, completed
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(TIMESTAMP(timezone=True), default=utc_now)
 
     # User Claims
     street = Column(String, nullable=True)

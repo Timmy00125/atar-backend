@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import datetime
@@ -27,5 +27,4 @@ class SessionResult(BaseModel):
     extracted_data: Optional[Dict[str, Any]] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

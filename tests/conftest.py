@@ -26,9 +26,9 @@ class MockAsyncSession:
         if hasattr(instance, "status") and instance.status is None:
             instance.status = "pending"
         if hasattr(instance, "created_at") and instance.created_at is None:
-            from datetime import datetime
+            from datetime import datetime, timezone
 
-            instance.created_at = datetime.utcnow()
+            instance.created_at = datetime.now(timezone.utc)
         self.store[instance.session_id] = instance
 
     async def commit(self):
