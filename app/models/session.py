@@ -30,6 +30,7 @@ class VerificationSession(Base):
 
     # AI Results
     document_paths = Column(ARRAY(String), nullable=True)
+    file_metadata = Column(JSON, nullable=True)  # Store EXIF/Meta data from files
     extracted_data = Column(JSON, nullable=True)
     verification_results = Column(JSON, nullable=True)
     trust_score = Column(Integer, nullable=True)

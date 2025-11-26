@@ -59,14 +59,39 @@ async def run_stage_1_extraction(file_paths: list[str]) -> dict:
     # Prepare contents
     contents = []
     prompt = """
-    Extract the following information from the provided document(s):
-    - Document Type (Utility Bill, ID, Admission Letter, CAC Certificate, etc.)
-    - Full Name
-    - Address (Street, City, State)
-    - Date (Issue Date, Bill Date)
-    - Organization Name (if applicable, e.g., for Tier 3 documents)
+    Analyze the provided images/documents. Identify and extract information for the following types:
     
-    Return the result as a valid JSON object.
+    1. **Logistics/Delivery Receipt** (e.g., Jumia, Food Delivery):
+       - Extract: Delivery Address, Recipient Name, Date.
+    
+    2. **House Image**:
+       - Identify if it is a picture of a residential building.
+       - Note any visible address numbers or landmarks if present.
+    
+    3. **Trust Score Documents** (Employment Letter, Pay Slip, School Admission, School Fees, etc.):
+       - Extract: Document Type, Organization Name, Person Name, Date.
+    
+    Return a JSON object with a list of analyzed documents, e.g.:
+    {
+      "documents": [
+        {
+          "type": "Logistics Receipt",
+          "address": "...",
+          "name": "...",
+          "date": "..."
+        },
+        {
+          "type": "House Image",
+          "is_residential": true,
+          "visible_address": "..."
+        },
+        {
+          "type": "Employment Letter",
+          "organization": "...",
+          "name": "..."
+        }
+      ]
+    }
     """
     contents.append(prompt)
 
@@ -116,34 +141,36 @@ async def run_stage_2_verification(
     }
 
     geolocation = {"latitude": session.latitude, "longitude": session.longitude}
+    file_metadata = session.file_metadata or {}
 
     prompt = f"""
-    You are a verification agent. Compare the extracted information with the user claims and geolocation.
+    You are a verification agent. Compare the extracted information with the user claims, geolocation, and file metadata.
     
     User Claims: {json.dumps(user_claims)}
     Extracted Data: {json.dumps(extracted_data)}
-    Geolocation: {json.dumps(geolocation)}
+    Geolocation (Claimed): {json.dumps(geolocation)}
+    File Metadata (EXIF/GPS): {json.dumps(file_metadata)}
     
     Task:
-    1. Compare Name: Does the name in the document match the user (implied or claimed)?
-    2. Compare Address: Does the extracted address match the claimed address?
-    3. Check Recency: Is the document recent (within last 3 months)?
-    4. Tier 3 Check: If Organization Name is claimed, does it match the extracted Organization Name?
-       - If match confidence >= 90%: Auto-Approve (+25 Trust Score)
-       - If 70-89%: Flag for Review
-       - If < 70%: Reject
+    1. **Location Verification**:
+       - Check if any 'House Image' has GPS metadata in 'File Metadata'.
+       - If yes, calculate the distance between Claimed Geolocation and Image GPS.
+       - Match if distance < 100 meters.
     
-    Calculate a Trust Score (0-100).
-    - Base score starts at 0.
-    - Address Match: +40
-    - Name Match: +20
-    - Recency: +15
-    - Tier 3 Match (if applicable): +25
+    2. **Address Verification**:
+       - Check if any 'Logistics Receipt' has an address matching the Claimed Address.
+    
+    3. **Trust Score Calculation**:
+       - Base Score: 0
+       - **Location Match (GPS)**: +30 points (if House Image GPS matches Claimed Location).
+       - **Address Match (Logistics)**: +30 points (if Receipt Address matches Claimed Address).
+       - **Trust Documents**: +10 points for each valid verified document (Employment, School, etc.), up to +40 points.
+       - **Recency**: +10 points if documents are recent (< 3 months).
     
     Return a JSON object with:
-    - trust_score: integer
-    - breakdown: object with details of matches
-    - verdict: "Approved", "Review", or "Rejected"
+    - trust_score: integer (0-100)
+    - breakdown: object with details of matches (location_match, address_match, trust_docs_match)
+    - verdict: "Approved" (Score >= 70), "Review" (Score 50-69), "Rejected" (Score < 50)
     """
 
     # Call Gemini Pro

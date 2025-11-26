@@ -26,9 +26,16 @@ async def test_submit_verification_data(client, mock_db_session):
         patch("os.makedirs", MagicMock()),
     ):
         # Mock background task function to verify it's called
-        with patch(
-            "app.api.v1.endpoints.verification.process_verification"
-        ) as mock_process:
+        with (
+            patch(
+                "app.api.v1.endpoints.verification.process_verification"
+            ) as mock_process,
+            patch(
+                "app.api.v1.endpoints.verification.extract_metadata_from_image"
+            ) as mock_extract,
+        ):
+            mock_extract.return_value = {"gps": {"latitude": 1.0, "longitude": 1.0}}
+
             files = {"documents": ("test_doc.jpg", b"fake image content", "image/jpeg")}
             data = {
                 "street": "123 Test St",

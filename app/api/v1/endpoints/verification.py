@@ -20,6 +20,7 @@ from app.core.database import get_db
 from app.models.session import VerificationSession
 from app.schemas.session import SessionCreateResponse, SessionResult
 from app.services.ai_service import process_verification
+from app.core.utils import extract_metadata_from_image
 
 router = APIRouter()
 
@@ -62,6 +63,7 @@ async def submit_verification_data(
 
     # Save files
     file_paths = []
+    file_metadata = {}
     session_upload_dir = os.path.join(UPLOAD_DIR, str(session_id))
     os.makedirs(session_upload_dir, exist_ok=True)
 
@@ -70,6 +72,11 @@ async def submit_verification_data(
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(doc.file, buffer)
         file_paths.append(file_path)
+
+        # Extract metadata
+        meta = extract_metadata_from_image(file_path)
+        if meta:
+            file_metadata[doc.filename] = meta
 
     # Update session data
     session.street = street
@@ -80,6 +87,7 @@ async def submit_verification_data(
     session.organization_name = organization_name
     session.organization_type = organization_type
     session.document_paths = file_paths
+    session.file_metadata = file_metadata
     session.status = "processing"
 
     await db.commit()
