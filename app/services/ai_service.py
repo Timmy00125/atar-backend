@@ -9,6 +9,7 @@ from app.core.database import AsyncSessionLocal
 from app.models.session import VerificationSession
 from app.core.config import settings
 from app.core.utils import calculate_haversine_distance
+from tenacity import retry, stop_after_attempt, wait_random_exponential
 
 # Initialize Gemini Client
 # Ensure GOOGLE_API_KEY is set in .env
@@ -54,6 +55,7 @@ async def process_verification(session_id: UUID):
         await db.commit()
 
 
+@retry(wait=wait_random_exponential(multiplier=1, max=60), stop=stop_after_attempt(5))
 async def run_stage_1_extraction(file_paths: list[str]) -> dict:
     """
     Stage 1: Extraction using Gemini 2.5 Flash (or similar fast model).
@@ -116,18 +118,15 @@ async def run_stage_1_extraction(file_paths: list[str]) -> dict:
     # Call Gemini Flash
     model_id = "gemini-2.5-flash"  # Adjust to 2.5 when available
 
-    try:
-        response = await client.aio.models.generate_content(
-            model=model_id,
-            contents=contents,
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
-        )
-        return json.loads(response.text)
-    except Exception as e:
-        print(f"Stage 1 Error: {e}")
-        return {"error": str(e)}
+    response = await client.aio.models.generate_content(
+        model=model_id,
+        contents=contents,
+        config=types.GenerateContentConfig(response_mime_type="application/json"),
+    )
+    return json.loads(response.text)
 
 
+@retry(wait=wait_random_exponential(multiplier=1, max=60), stop=stop_after_attempt(5))
 async def run_stage_2_verification(
     session: VerificationSession, extracted_data: dict
 ) -> dict:
@@ -206,13 +205,9 @@ async def run_stage_2_verification(
     # Call Gemini Pro
     model_id = "gemini-2.5-pro"  # Adjust to 2.5 Pro when available
 
-    try:
-        response = await client.aio.models.generate_content(
-            model=model_id,
-            contents=prompt,
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
-        )
-        return json.loads(response.text)
-    except Exception as e:
-        print(f"Stage 2 Error: {e}")
-        return {"error": str(e)}
+    response = await client.aio.models.generate_content(
+        model=model_id,
+        contents=prompt,
+        config=types.GenerateContentConfig(response_mime_type="application/json"),
+    )
+    return json.loads(response.text)
