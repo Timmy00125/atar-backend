@@ -1,11 +1,12 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.api.v1.endpoints import verification
 from app.core.database import engine, Base
+from app.schemas.session import APIResponse
 
 
 @asynccontextmanager
@@ -44,11 +45,27 @@ async def fix_double_slashes(request: Request, call_next):
     return response
 
 
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=APIResponse(
+            success=False,
+            message=str(exc.detail),
+            data=None,
+        ).model_dump(mode="json"),
+    )
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
-        content={"message": f"Internal Server Error: {str(exc)}"},
+        content=APIResponse(
+            success=False,
+            message=f"Internal Server Error: {str(exc)}",
+            data=None,
+        ).model_dump(mode="json"),
     )
 
 
@@ -60,6 +77,10 @@ app.include_router(
 )
 
 
-@app.get(f"{settings.API_V1_STR}/health")
+@app.get(f"{settings.API_V1_STR}/health", response_model=APIResponse[dict])
 async def health_check():
-    return {"status": "ok"}
+    return APIResponse(
+        success=True,
+        message="Health check passed",
+        data={"status": "ok"},
+    )

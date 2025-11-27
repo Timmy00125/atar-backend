@@ -20,7 +20,7 @@ import asyncio
 
 from app.core.database import get_db
 from app.models.session import VerificationSession
-from app.schemas.session import SessionCreateResponse, SessionResult
+from app.schemas.session import SessionCreateResponse, SessionResult, APIResponse
 from app.services.ai_service import process_verification
 from app.core.utils import extract_metadata_from_image
 
@@ -30,18 +30,22 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-@router.post("/session", response_model=SessionCreateResponse)
+@router.post("/session", response_model=APIResponse[SessionCreateResponse])
 async def create_session(db: AsyncSession = Depends(get_db)):
     new_session = VerificationSession()
     db.add(new_session)
     await db.commit()
     await db.refresh(new_session)
-    return SessionCreateResponse(
-        session_id=new_session.session_id, status=new_session.status
+    return APIResponse(
+        success=True,
+        message="Session created successfully",
+        data=SessionCreateResponse(
+            session_id=new_session.session_id, status=new_session.status
+        ),
     )
 
 
-@router.post("/{session_id}/submit")
+@router.post("/{session_id}/submit", response_model=APIResponse[dict])
 async def submit_verification_data(
     session_id: UUID,
     background_tasks: BackgroundTasks,
@@ -99,10 +103,14 @@ async def submit_verification_data(
     # Trigger background task
     background_tasks.add_task(process_verification, session_id)
 
-    return {"message": "Submission received", "status": "processing"}
+    return APIResponse(
+        success=True,
+        message="Submission received",
+        data={"status": "processing"},
+    )
 
 
-@router.get("/{session_id}/results", response_model=SessionResult)
+@router.get("/{session_id}/results", response_model=APIResponse[SessionResult])
 async def get_results(session_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(VerificationSession).where(VerificationSession.session_id == session_id)
@@ -112,13 +120,19 @@ async def get_results(session_id: UUID, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     if session.status == "processing":
-        # Return 202 Accepted if still processing, but FastAPI response_model might expect the full object.
-        # The README says "Return HTTP 202".
-        # We can raise an HTTPException or return a Response object.
-        # For now, let's just return the session object, the client can check the status.
-        # Or strictly follow the requirement:
-        from fastapi import Response
+        from fastapi.responses import JSONResponse
 
-        return Response(status_code=status.HTTP_202_ACCEPTED)
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content=APIResponse(
+                success=True,
+                message="Verification is still in progress",
+                data=None,
+            ).model_dump(mode="json"),
+        )
 
-    return session
+    return APIResponse(
+        success=True,
+        message="Verification results retrieved",
+        data=SessionResult.model_validate(session),
+    )

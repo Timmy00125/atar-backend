@@ -180,26 +180,29 @@ async def run_stage_2_verification(
     
     Scoring Criteria:
     1. **Physical Location Evidence (House Image)**:
-       - If House Image is present AND GPS metadata matches Claimed Geolocation (< 100m): +30 points.
-       - If House Image is present but no GPS match (visual confirmation only): +10 points.
+       - If House Image is present AND GPS metadata matches Claimed Geolocation (< 100m): 30 points.
+       - If House Image is present but no GPS match (visual confirmation only): 10 points.
+       - No House Image: 0 points.
     
     2. **Logistics/Activity Evidence (Delivery Receipts)**:
-       - If a recent Logistics/Delivery Receipt matches the Claimed Address: +30 points.
+       - If a recent Logistics/Delivery Receipt matches the Claimed Address: 30 points.
        - If the name on the receipt also matches the User: +5 bonus points.
+       - Max: 35 points.
     
     3. **Institutional/Trust Evidence (Employment, School, etc.)**:
-       - For EACH valid document (Employment Letter, Pay Slip, School Admission, School Fees, etc.) that verifies the User's Identity: +10 points.
+       - For EACH valid document (Employment Letter, Pay Slip, School Admission, School Fees, etc.) that verifies the User's Identity: 10 points.
        - If the document ALSO contains the Claimed Address: +5 bonus points per document.
        - Max points for this category: 40.
     
     4. **Recency Check**:
-       - If the majority of documents are recent (< 3 months): +10 points.
+       - If the majority of documents are recent (< 3 months): 10 points.
+       - Otherwise: 0 points.
     
     Total Score cannot exceed 100.
     
     Return a JSON object with:
     - trust_score: integer (0-100)
-    - breakdown: object with details (house_match, logistics_match, institutional_proofs, recency)
+    - breakdown: object with details (house_match_score, logistics_match_score, institutional_proofs_score, recency_score)
     - verdict: "Approved" (Score >= 70), "Review" (Score 50-69), "Rejected" (Score < 50)
     """
 

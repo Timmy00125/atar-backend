@@ -28,7 +28,12 @@ async def test_stage_2_verification_high_trust(mock_gemini_client):
 
     expected_response = {
         "trust_score": 85,
-        "breakdown": {"address_match": True, "name_match": True, "recency": True},
+        "breakdown": {
+            "house_match_score": 30,
+            "logistics_match_score": 35,
+            "institutional_proofs_score": 10,
+            "recency_score": 10,
+        },
         "verdict": "Approved",
     }
 
@@ -74,7 +79,12 @@ async def test_stage_2_verification_tier_3_approve(mock_gemini_client):
 
     expected_response = {
         "trust_score": 95,
-        "breakdown": {"tier_3_match": True, "confidence": 95},
+        "breakdown": {
+            "house_match_score": 0,
+            "logistics_match_score": 0,
+            "institutional_proofs_score": 40,
+            "recency_score": 10,
+        },
         "verdict": "Approved",
     }
 
@@ -113,7 +123,12 @@ async def test_stage_2_verification_tier_3_reject(mock_gemini_client):
 
     expected_response = {
         "trust_score": 20,
-        "breakdown": {"tier_3_match": False, "confidence": 10},
+        "breakdown": {
+            "house_match_score": 0,
+            "logistics_match_score": 0,
+            "institutional_proofs_score": 0,
+            "recency_score": 10,
+        },
         "verdict": "Rejected",
     }
 
@@ -150,11 +165,15 @@ async def test_stage_1_extraction(mock_gemini_client):
     # Mock file reading
     mock_open = MagicMock()
     mock_file = MagicMock()
-    mock_file.read.return_value = b"fake image content"
-    mock_open.return_value.__enter__.return_value = mock_file
+
+    async def async_read(*args, **kwargs):
+        return b"fake image content"
+
+    mock_file.read.side_effect = async_read
+    mock_open.return_value.__aenter__.return_value = mock_file
 
     with (
-        patch("builtins.open", mock_open),
+        patch("app.services.ai_service.aiofiles.open", mock_open),
         patch("os.path.exists", return_value=True),
     ):
         # Execute

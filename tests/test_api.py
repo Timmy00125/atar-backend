@@ -8,15 +8,16 @@ async def test_create_session(client):
     response = await client.post("/api/v1/verification/session")
     assert response.status_code == 200
     data = response.json()
-    assert "session_id" in data
-    assert data["status"] == "pending"
+    assert data["success"] is True
+    assert "session_id" in data["data"]
+    assert data["data"]["status"] == "pending"
 
 
 @pytest.mark.asyncio
 async def test_submit_verification_data(client, mock_db_session):
     # 1. Create Session
     response = await client.post("/api/v1/verification/session")
-    session_id = response.json()["session_id"]
+    session_id = response.json()["data"]["session_id"]
 
     # 2. Submit Data
     # Mock file handling to avoid disk I/O
@@ -66,7 +67,7 @@ async def test_submit_verification_data(client, mock_db_session):
             )
 
             assert response.status_code == 200
-            assert response.json()["status"] == "processing"
+            assert response.json()["data"]["status"] == "processing"
 
             # Verify session was updated in DB
             sid = UUID(session_id)
@@ -79,13 +80,13 @@ async def test_submit_verification_data(client, mock_db_session):
 async def test_get_results(client, mock_db_session):
     # 1. Create Session
     response = await client.post("/api/v1/verification/session")
-    session_id = response.json()["session_id"]
+    session_id = response.json()["data"]["session_id"]
 
     # 2. Get Results (Initial)
     response = await client.get(f"/api/v1/verification/{session_id}/results")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "pending"
+    assert data["data"]["status"] == "pending"
 
     # 3. Simulate Completion
     # Manually update the session in the mock DB
@@ -93,15 +94,22 @@ async def test_get_results(client, mock_db_session):
     session = mock_db_session.store[sid]
     session.status = "completed"
     session.trust_score = 90
-    session.verification_results = {"verdict": "Approved"}
+    session.verification_results = {
+        "trust_score": 90,
+        "verdict": "Approved",
+        "breakdown": {"house_match_score": 30},
+    }
 
     # 4. Get Results (Completed)
     response = await client.get(f"/api/v1/verification/{session_id}/results")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "completed"
-    assert data["trust_score"] == 90
-    assert data["verification_results"]["verdict"] == "Approved"
+    assert data["data"]["status"] == "completed"
+    assert data["data"]["trust_score"] == 90
+    assert data["data"]["verification_results"]["verdict"] == "Approved"
+    assert data["data"]["trust_analysis"]["trust_score"] == 90
+    assert data["data"]["trust_analysis"]["verdict"] == "Approved"
+    assert data["data"]["trust_analysis"]["breakdown"]["house_match_score"] == 30
 
 
 @pytest.mark.asyncio

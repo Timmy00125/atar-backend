@@ -34,3 +34,9 @@ class VerificationSession(Base):
     extracted_data = Column(JSON, nullable=True)
     verification_results = Column(JSON, nullable=True)
     trust_score = Column(Integer, nullable=True)
+
+    @property
+    def trust_analysis(self):
+        if self.verification_results:
+            return self.verification_results
+        return None
