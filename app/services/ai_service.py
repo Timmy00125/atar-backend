@@ -2,6 +2,7 @@ from uuid import UUID
 from sqlalchemy import select
 import json
 import os
+import aiofiles
 from datetime import datetime
 from google import genai
 from google.genai import types
@@ -103,8 +104,8 @@ async def run_stage_1_extraction(file_paths: list[str]) -> dict:
         if not os.path.exists(path):
             continue
 
-        with open(path, "rb") as f:
-            image_data = f.read()
+        async with aiofiles.open(path, "rb") as f:
+            image_data = await f.read()
             # Assuming images. For PDFs, might need different handling or mime type.
             # Simple mime type detection based on extension
             mime_type = "image/jpeg"

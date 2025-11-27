@@ -15,6 +15,8 @@ from uuid import UUID
 import shutil
 import os
 import uuid
+import aiofiles
+import asyncio
 
 from app.core.database import get_db
 from app.models.session import VerificationSession
@@ -69,12 +71,14 @@ async def submit_verification_data(
 
     for doc in documents:
         file_path = os.path.join(session_upload_dir, doc.filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(doc.file, buffer)
+        async with aiofiles.open(file_path, "wb") as buffer:
+            while content := await doc.read(1024 * 1024):  # Read in 1MB chunks
+                await buffer.write(content)
         file_paths.append(file_path)
 
         # Extract metadata
-        meta = extract_metadata_from_image(file_path)
+        loop = asyncio.get_running_loop()
+        meta = await loop.run_in_executor(None, extract_metadata_from_image, file_path)
         if meta:
             file_metadata[doc.filename] = meta
 

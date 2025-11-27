@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from uuid import uuid4, UUID
 
 
@@ -20,9 +20,24 @@ async def test_submit_verification_data(client, mock_db_session):
 
     # 2. Submit Data
     # Mock file handling to avoid disk I/O
+    mock_file = MagicMock()
+    mock_file.write = AsyncMock()
+
+    mock_ctx = MagicMock()
+
+    async def aenter(*args):
+        return mock_file
+
+    async def aexit(*args):
+        pass
+
+    mock_ctx.__aenter__ = aenter
+    mock_ctx.__aexit__ = aexit
+
+    mock_open = MagicMock(return_value=mock_ctx)
+
     with (
-        patch("builtins.open", MagicMock()) as mock_open,
-        patch("shutil.copyfileobj", MagicMock()) as mock_copy,
+        patch("aiofiles.open", mock_open),
         patch("os.makedirs", MagicMock()),
     ):
         # Mock background task function to verify it's called
