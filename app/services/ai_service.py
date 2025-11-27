@@ -8,6 +8,7 @@ from google.genai import types
 from app.core.database import AsyncSessionLocal
 from app.models.session import VerificationSession
 from app.core.config import settings
+from app.core.utils import calculate_haversine_distance
 
 # Initialize Gemini Client
 # Ensure GOOGLE_API_KEY is set in .env
@@ -145,6 +146,26 @@ async def run_stage_2_verification(
     file_metadata = session.file_metadata or {}
     current_date = datetime.now().strftime("%Y-%m-%d")
 
+    # Calculate Haversine distances for images with GPS data
+    gps_analysis = []
+    for filename, meta in file_metadata.items():
+        if "gps" in meta:
+            img_lat = meta["gps"]["latitude"]
+            img_lon = meta["gps"]["longitude"]
+            distance = calculate_haversine_distance(
+                session.latitude, session.longitude, img_lat, img_lon
+            )
+            gps_analysis.append(
+                {
+                    "filename": filename,
+                    "distance_meters": round(distance, 2),
+                    "image_coords": {"lat": img_lat, "lon": img_lon},
+                    "match_status": "MATCH"
+                    if distance < 100
+                    else "MISMATCH",  # Threshold of 100m
+                }
+            )
+
     prompt = f"""
     You are a verification agent. Your goal is to verify that the User's Claimed Address is genuine based on the provided evidence.
     
@@ -153,6 +174,7 @@ async def run_stage_2_verification(
     Extracted Data: {json.dumps(extracted_data)}
     Geolocation (Claimed): {json.dumps(geolocation)}
     File Metadata (EXIF/GPS): {json.dumps(file_metadata)}
+    Computed GPS Distances (Haversine): {json.dumps(gps_analysis)}
     
     Analyze ALL provided data to calculate a Trust Score (0-100).
     
