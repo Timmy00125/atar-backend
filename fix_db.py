@@ -1,8 +1,9 @@
 import asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
+from app.core.config import settings
 
-DATABASE_URL = "postgresql+asyncpg://user:password@localhost/atar_db"
+DATABASE_URL = settings.DATABASE_URL
 
 
 async def fix_db():
